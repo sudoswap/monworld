@@ -29,10 +29,13 @@ contract MonWorld {
     function move(MoveDirection dir) public virtual {
         address player = LibMulticaller.senderOrSigner();
         Position pos = getPlayerPosition(player);
-        Tile memory destTile = getTile(pos.applyMove(dir));
+        Position destPos = pos.applyMove(dir);
+        // early return if already moving to that position
+        if (_playerPositions[player].pendingPos == destPos) return;
+        Tile memory destTile = getTile(destPos);
         _playerPositions[player] = PlayerPosition({
             currentPos: pos,
-            pendingPos: pos.applyMove(dir),
+            pendingPos: destPos,
             pendingPosBlock: block.number + destTile.terrain.blocksToMove
         });
     }
@@ -44,5 +47,8 @@ contract MonWorld {
             : playerPos.currentPos;
     }
 
-    function getTile(Position pos) public view virtual returns (Tile memory tile) {}
+    function getTile(Position pos) public view virtual returns (Tile memory tile) {
+        // TODO: generate tiles with algo
+        // TODO: apply overrides (e.g. buildings)
+    }
 }
