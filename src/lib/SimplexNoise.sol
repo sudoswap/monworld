@@ -40,8 +40,8 @@ library SimplexNoise {
         uint8 gi1;
         uint8 gi2;
         unchecked {
-            uint8 ii = uint8(int8(i % PERIOD));
-            uint8 jj = uint8(int8(j % PERIOD));
+            uint8 ii = modPeriodInt(i);
+            uint8 jj = modPeriodInt(j);
             gi0 = uint8(perm[ii + uint8(perm[jj])]) % 12;
             gi1 = uint8(perm[ii + i1 + uint8(perm[jj + j1])]) % 12;
             gi2 = uint8(perm[ii + 1 + uint8(perm[jj + 1])]) % 12;
@@ -62,7 +62,7 @@ library SimplexNoise {
         int256 gy;
         if (ttWad > 0) {
             (gx, gy) = grad3(gi0);
-            noiseWad = ttWadAbs.rpow(4, FixedPointMathLib.WAD).toInt256() * (gx * x0Wad + gy * y0Wad);
+            noiseWad = ttWadAbs.rpow(4, FixedPointMathLib.WAD).toInt256().sMulWad(gx * x0Wad + gy * y0Wad);
         } else {
             noiseWad = 0;
         }
@@ -71,14 +71,14 @@ library SimplexNoise {
         ttWadAbs = FixedPointMathLib.abs(ttWad);
         if (ttWad > 0) {
             (gx, gy) = grad3(gi1);
-            noiseWad += ttWadAbs.rpow(4, FixedPointMathLib.WAD).toInt256() * (gx * x1Wad + gy * y1Wad);
+            noiseWad += ttWadAbs.rpow(4, FixedPointMathLib.WAD).toInt256().sMulWad(gx * x1Wad + gy * y1Wad);
         }
 
         ttWad = WAD / 2 - x2Wad.sMulWad(x2Wad) - y2Wad.sMulWad(y2Wad);
         ttWadAbs = FixedPointMathLib.abs(ttWad);
         if (ttWad > 0) {
             (gx, gy) = grad3(gi2);
-            noiseWad += ttWadAbs.rpow(4, FixedPointMathLib.WAD).toInt256() * (gx * x2Wad + gy * y2Wad);
+            noiseWad += ttWadAbs.rpow(4, FixedPointMathLib.WAD).toInt256().sMulWad(gx * x2Wad + gy * y2Wad);
         }
 
         // Scale noiseWad to [-WAD, WAD]
@@ -102,5 +102,11 @@ library SimplexNoise {
     function divWadDown(int256 a) internal pure returns (int256 z) {
         z = a / WAD;
         if (a < 0 && a % WAD != 0) z--; // round towards negative infinity
+    }
+
+    function modPeriodInt(int256 a) internal pure returns (uint8 z) {
+        int8 result = int8(a % PERIOD);
+        if (result < 0) result += int8(PERIOD);
+        z = uint8(result);
     }
 }

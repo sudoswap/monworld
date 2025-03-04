@@ -18,8 +18,8 @@ library MapGen {
     int256 internal constant WAD = 1 ether;
     int256 internal constant ELEVATION_BIAS_WAD = 0.1 ether;
 
-    int256 internal constant WATER_THRESHOLD_WAD = -0.2 ether;
-    int256 internal constant MOUNTAIN_THRESHOLD_WAD = 0.3 ether;
+    int256 internal constant WATER_THRESHOLD_WAD = -0.5 ether;
+    int256 internal constant MOUNTAIN_THRESHOLD_WAD = 0.5 ether;
     int256 internal constant FOREST_THRESHOLD_WAD = 0.55 ether;
 
     uint256 internal constant MIN_SIMILAR_NEIGHBORS = 2; // Minimum similar neighbors to prevent isolated tiles
@@ -29,14 +29,14 @@ library MapGen {
 
     /// @notice Returns the elevation at a position, result is between -1 and 1 and scaled by WAD.
     function getElevation(Position pos) internal pure returns (int256 elevationWad) {
-        elevationWad = fractal({pos: pos, octaves: 3, persistenceWad: 0.5 ether, lacunarityWad: 2 ether, permId: 0});
+        elevationWad = fractal({pos: pos, octaves: 1, persistenceWad: 0.5 ether, lacunarityWad: 2 ether, permId: 0});
         elevationWad += ELEVATION_BIAS_WAD;
         elevationWad = elevationWad.clamp(-WAD, WAD);
     }
 
     /// @notice Returns the moisture at a position, result is between 0 and 1 and scaled by WAD.
     function getMoisture(Position pos) internal pure returns (int256 moistureWad) {
-        moistureWad = fractal({pos: pos, octaves: 2, persistenceWad: 0.5 ether, lacunarityWad: 2 ether, permId: 1});
+        moistureWad = fractal({pos: pos, octaves: 1, persistenceWad: 0.5 ether, lacunarityWad: 2 ether, permId: 1});
         moistureWad = (moistureWad + WAD) / 2; // scale to 0-1
     }
 
@@ -173,16 +173,17 @@ library MapGen {
         if (octaves == 0) return 0;
         int128 x = pos.x();
         int128 y = pos.y();
-        int128 frequency = 1;
-        int256 amplitude = 1;
-        int256 maxValue = 0;
+        int128 frequencyWad = int128(WAD);
+        int256 amplitudeWad = WAD;
+        int256 maxValueWad = 0;
         bytes memory perm = permId == 0 ? PERM_0 : PERM_1;
         for (uint256 i; i < octaves; i++) {
-            total += SimplexNoise.noise(x * frequency, y * frequency, perm) * amplitude;
-            maxValue += amplitude;
-            amplitude = amplitude.sMulWad(persistenceWad);
-            frequency = frequency.sMulWad(lacunarityWad).toInt128();
+            total += SimplexNoise.noise(x.sMulWad(frequencyWad).toInt128(), y.sMulWad(frequencyWad).toInt128(), perm)
+                .sMulWad(amplitudeWad);
+            maxValueWad += amplitudeWad;
+            amplitudeWad = amplitudeWad.sMulWad(persistenceWad);
+            frequencyWad = frequencyWad.sMulWad(lacunarityWad).toInt128();
         }
-        return total / maxValue;
+        return total.sDivWad(maxValueWad);
     }
 }

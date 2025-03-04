@@ -14,11 +14,11 @@ function equals(Position pos1, Position pos2) pure returns (bool) {
 
 library PositionLib {
     function x(Position pos) internal pure returns (int128) {
-        return int128(uint128(uint256(Position.unwrap(pos) >> 128)));
+        return int128(uint128(bytes16(Position.unwrap(pos))));
     }
 
     function y(Position pos) internal pure returns (int128) {
-        return int128(uint128(bytes16(Position.unwrap(pos))));
+        return int128(uint128(bytes16(Position.unwrap(pos) << 128)));
     }
 
     function fromCoordinates(int128 xCord, int128 yCord) internal pure returns (Position) {
