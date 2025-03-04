@@ -6,6 +6,11 @@ import {MoveDirection} from "./MoveDirection.sol";
 type Position is bytes32;
 
 using PositionLib for Position global;
+using {equals as ==} for Position global;
+
+function equals(Position pos1, Position pos2) pure returns (bool) {
+    return Position.unwrap(pos1) == Position.unwrap(pos2);
+}
 
 library PositionLib {
     function x(Position pos) internal pure returns (int128) {

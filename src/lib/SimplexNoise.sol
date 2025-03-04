@@ -17,11 +17,18 @@ library SimplexNoise {
     int256 internal constant _F2 = 366025403784438646;
     int256 internal constant _G2 = 211324865405187117;
 
-    function noise(int128 x, int128 y, bytes32 permA, bytes32 permB, bytes32 permC, bytes32 permD)
-        internal
-        pure
-        returns (int256 noise)
-    {
+    function noise(
+        int128 x,
+        int128 y,
+        bytes32 permA,
+        bytes32 permB,
+        bytes32 permC,
+        bytes32 permD,
+        bytes32 permE,
+        bytes32 permF,
+        bytes32 permG,
+        bytes32 permH
+    ) internal pure returns (int256 noiseWad) {
         // Skew input space to determine which simplex (triangle) we are in
         int256 sWad = (x + y) * _F2;
         int256 i = divWadDown(x * WAD + sWad);
@@ -32,7 +39,8 @@ library SimplexNoise {
         int256 x0Wad = x * WAD - (i * WAD - tWad);
         int256 y0Wad = y * WAD - (j * WAD - tWad);
 
-        (int256 i1Wad, int256 j1Wad, uint8 i1, uint8 j1) = x0Wad > y0Wad ? (WAD, 0, 1, 0) : (0, WAD, 0, 1);
+        (int256 i1Wad, int256 j1Wad, uint8 i1, uint8 j1) =
+            x0Wad > y0Wad ? (WAD, int256(0), 1, 0) : (int256(0), WAD, 0, 1);
 
         // Offsets for middle corner in (x,y) unskewed coords
         int256 x1Wad = x0Wad - i1Wad + _G2;
@@ -50,13 +58,37 @@ library SimplexNoise {
         uint8 gi2;
         unchecked {
             gi0 = ConstByteArray.get(
-                ii + ConstByteArray.get(jj, permA, permB, permC, permD), permA, permB, permC, permD
+                ii + ConstByteArray.get(jj, permA, permB, permC, permD, permE, permF, permG, permH),
+                permA,
+                permB,
+                permC,
+                permD,
+                permE,
+                permF,
+                permG,
+                permH
             ) % 12;
             gi1 = ConstByteArray.get(
-                ii + i1 + ConstByteArray.get(jj + j1, permA, permB, permC, permD), permA, permB, permC, permD
+                ii + i1 + ConstByteArray.get(jj + j1, permA, permB, permC, permD, permE, permF, permG, permH),
+                permA,
+                permB,
+                permC,
+                permD,
+                permE,
+                permF,
+                permG,
+                permH
             ) % 12;
             gi2 = ConstByteArray.get(
-                ii + 1 + ConstByteArray.get(jj + 1, permA, permB, permC, permD), permA, permB, permC, permD
+                ii + 1 + ConstByteArray.get(jj + 1, permA, permB, permC, permD, permE, permF, permG, permH),
+                permA,
+                permB,
+                permC,
+                permD,
+                permE,
+                permF,
+                permG,
+                permH
             ) % 12;
         }
 
@@ -67,27 +99,27 @@ library SimplexNoise {
         int256 gy;
         if (ttWad > 0) {
             (gx, gy) = grad3(gi0);
-            noise = ttWadAbs.rpow(4, FixedPointMathLib.WAD).toInt256() * (gx * x0Wad + gy * y0Wad);
+            noiseWad = ttWadAbs.rpow(4, FixedPointMathLib.WAD).toInt256() * (gx * x0Wad + gy * y0Wad);
         } else {
-            noise = 0;
+            noiseWad = 0;
         }
 
         ttWad = WAD / 2 - x1Wad.sMulWad(x1Wad) - y1Wad.sMulWad(y1Wad);
         ttWadAbs = FixedPointMathLib.abs(ttWad);
         if (ttWad > 0) {
             (gx, gy) = grad3(gi1);
-            noise += ttWadAbs.rpow(4, FixedPointMathLib.WAD).toInt256() * (gx * x1Wad + gy * y1Wad);
+            noiseWad += ttWadAbs.rpow(4, FixedPointMathLib.WAD).toInt256() * (gx * x1Wad + gy * y1Wad);
         }
 
         ttWad = WAD / 2 - x2Wad.sMulWad(x2Wad) - y2Wad.sMulWad(y2Wad);
         ttWadAbs = FixedPointMathLib.abs(ttWad);
         if (ttWad > 0) {
             (gx, gy) = grad3(gi2);
-            noise += ttWadAbs.rpow(4, FixedPointMathLib.WAD).toInt256() * (gx * x2Wad + gy * y2Wad);
+            noiseWad += ttWadAbs.rpow(4, FixedPointMathLib.WAD).toInt256() * (gx * x2Wad + gy * y2Wad);
         }
 
-        // Scale noise to [-WAD, WAD]
-        return noise * 70;
+        // Scale noiseWad to [-WAD, WAD]
+        return noiseWad * 70;
     }
 
     /// @dev 3D Gradient vectors
@@ -98,10 +130,10 @@ library SimplexNoise {
     /// )
     function grad3(uint8 idx) internal pure returns (int256 gx, int256 gy) {
         // compute gx
-        gx = idx < 8 ? (idx % 2 == 0 ? 1 : -1) : 0;
+        gx = idx < 8 ? (idx % 2 == 0 ? int256(1) : -1) : int256(0);
 
         // compute gy
-        gy = idx < 2 ? 1 : (idx < 4 ? -1 : (idx < 8 ? 0 : (idx % 2 == 0 ? 1 : -1)));
+        gy = idx < 2 ? int256(1) : (idx < 4 ? -1 : (idx < 8 ? int256(0) : (idx % 2 == 0 ? int256(1) : -1)));
     }
 
     function divWadDown(int256 a) internal pure returns (int256 z) {
