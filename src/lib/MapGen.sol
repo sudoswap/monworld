@@ -6,34 +6,14 @@ import "solady/Milady.sol";
 import "./SimplexNoise.sol";
 import "../types/Types.sol";
 
-enum TerrainType {
-    WATER,
-    GRASSLAND,
-    FOREST,
-    MOUNTAIN
-}
-
 library MapGen {
     using SafeCastLib for *;
     using FixedPointMathLib for *;
 
-    bytes32 private constant PERM_0_A = 0x2b6622a59179ac312924954506c6996ace203303dc6fe7d5c9a658c56d3ccbd6;
-    bytes32 private constant PERM_0_B = 0x7d69defeda628f23508db18ae9b757e34198a242c0af8534cfaef45ec838c3f2;
-    bytes32 private constant PERM_0_C = 0x48aa74ad196bd7b8f69654f1d0f52e2de500882a3b0f83351367051bba971d0a;
-    bytes32 private constant PERM_0_D = 0xefb57b271415a18efcf9b972a9391171eb9e5a0d1ab33d8cd30204599037e216;
-    bytes32 private constant PERM_0_E = 0x4dbb84e8402f43c40e529b535f92364cb056a7a4d261eaeeab639adf9f75ec5c;
-    bytes32 private constant PERM_0_F = 0xb69480d921bf87fbe66cf3ffe0fd075dc2080b10861ff89dc7b481caa37355bd;
-    bytes32 private constant PERM_0_G = 0x324ad47c9c5b76264f6e473edd68a0bc704e8b17933a303f1851e1e4f7bedbd8;
-    bytes32 private constant PERM_0_H = 0x257801d128ed7e46cc12a8654b1efa2c49b27f0c89c182647a77f04409cd601c;
-
-    bytes32 private constant PERM_1_A = 0xa6e2114596ef3843d767d566bbac6a544f6e6da25eb4f84bce728a7464d914ad;
-    bytes32 private constant PERM_1_B = 0x3ddb51c2e053e7a17a250bcdf6dcf7210e629fe112b86ffc873733be286800f5;
-    bytes32 private constant PERM_1_C = 0x2fd2fd7db73cd13699b28bd6e82a49b1d818cb6b717386084d4c193504e98e46;
-    bytes32 private constant PERM_1_D = 0xf061a0767bdd0c59a99c2b025c9eb981bfd31af926804e91a4133e635f1d0527;
-    bytes32 private constant PERM_1_E = 0xabff40dffb7993e3cc98eebc29de34ca22a5e4f465bac3a7708c85507884cf09;
-    bytes32 private constant PERM_1_F = 0xec413b4a2030c4aa95529d150a48428947ead4ed8f771e07c1c5582c7f825d0f;
-    bytes32 private constant PERM_1_G = 0x172e39607eb5c7012d9b31c6c0fec9b05b24a31cb397f3559a7c3afaa8c8ae1f;
-    bytes32 private constant PERM_1_H = 0x3faf0df21b5a23b6168344f188dae50669bd8dd0109057e603756ceb92943256;
+    bytes private constant PERM_0 =
+        hex"cb74db577ff9dca03ecd0c40793d89da8197fb763f48299013f510cc5a01068aa116d015c191c9805195ffaa1f845c6f8e2724c54c56caf18c6c2d7894ef030de2266639fc9e96b6d7508263734b4ddf32eeddbcb431a45e0f720a936853ec3a4ac247ac3baf65c0e5ae98b2a569aba8676b144964c3f3375d2871365925e32ce62e55a9751c60862118be38fdb97a83b3d923d358442fa25fc8bd086ed2adb061346a9be16da34207fa5b879f3cf0eb7da646c4f8852270e4bfd88bedf7f28dcf772bde52029d1930bab1623599ce452a9ac71d54f617334f7cc60bb5fee9921b1109207b1ee041ea7ea700e8d6d59c1a4eb8f4430512e7d1b7040ed4bb888f";
+    bytes private constant PERM_1 =
+        hex"161c0e3f5a41dc520f79a697a530a2e4b080241df6ba90d5fd22f0f5c623faa7f79bd7448fa358087a18c426fbd111c5e972d22909150bd927d404b942d314849e35f4bef2fce8ea6907ef8cace0daaf6631773e6b9dd8fe3c36861e7f49ff821995ec5194bfe2a4eb819fce91f16a85398e4c37bb55b7eebd76015f3d45b8c8e7a1aedf9217aa89cc133b2d5bca4ef3bc0a2847b4c02560de73e675db886cab4b545c989368d000cb561fb26d8b9a02995e432ae153a88a507465207e59cd2c12ed2e0d70b65d6164b3adcf349c578ddd78e562634d2f213af8a06703338305107c876f3246a938c96eb5c17dc77bc32bc24ab1711a484fd696f940e31b0c06";
 
     int256 internal constant WAD = 1 ether;
     int256 internal constant ELEVATION_BIAS_WAD = 0.1 ether;
@@ -196,22 +176,9 @@ library MapGen {
         int128 frequency = 1;
         int256 amplitude = 1;
         int256 maxValue = 0;
-        (
-            bytes32 permA,
-            bytes32 permB,
-            bytes32 permC,
-            bytes32 permD,
-            bytes32 permE,
-            bytes32 permF,
-            bytes32 permG,
-            bytes32 permH
-        ) = permId == 0
-            ? (PERM_0_A, PERM_0_B, PERM_0_C, PERM_0_D, PERM_0_E, PERM_0_F, PERM_0_G, PERM_0_H)
-            : (PERM_1_A, PERM_1_B, PERM_1_C, PERM_1_D, PERM_1_E, PERM_1_F, PERM_1_G, PERM_1_H);
+        bytes memory perm = permId == 0 ? PERM_0 : PERM_1;
         for (uint256 i; i < octaves; i++) {
-            total += SimplexNoise.noise(
-                x * frequency, y * frequency, permA, permB, permC, permD, permE, permF, permG, permH
-            ) * amplitude;
+            total += SimplexNoise.noise(x * frequency, y * frequency, perm) * amplitude;
             maxValue += amplitude;
             amplitude = amplitude.sMulWad(persistenceWad);
             frequency = frequency.sMulWad(lacunarityWad).toInt128();

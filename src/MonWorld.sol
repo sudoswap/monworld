@@ -5,12 +5,7 @@ import {LibMulticaller} from "multicaller/LibMulticaller.sol";
 import "solady/Milady.sol";
 
 import "./types/Types.sol";
-
-struct Terrain {
-    uint256 id;
-    uint256 blocksToMove;
-    string name;
-}
+import {MapGen} from "./lib/MapGen.sol";
 
 struct Tile {
     Terrain terrain;
@@ -25,6 +20,7 @@ struct PlayerPosition {
 
 contract MonWorld {
     mapping(address player => PlayerPosition) internal _playerPositions;
+    mapping(Position pos => TerrainType) internal _terrainCache;
 
     function move(MoveDirection dir) public virtual {
         address player = LibMulticaller.senderOrSigner();
@@ -32,7 +28,7 @@ contract MonWorld {
         Position destPos = pos.applyMove(dir);
         // early return if already moving to that position
         if (_playerPositions[player].pendingPos == destPos) return;
-        Tile memory destTile = getTile(destPos);
+        Tile memory destTile = getTileWrite(destPos);
         _playerPositions[player] = PlayerPosition({
             currentPos: pos,
             pendingPos: destPos,
@@ -47,8 +43,30 @@ contract MonWorld {
             : playerPos.currentPos;
     }
 
-    function getTile(Position pos) public view virtual returns (Tile memory tile) {
-        // TODO: generate tiles with algo
+    function getTileView(Position pos) public view virtual returns (Tile memory tile) {
+        // get base terrain type
+        TerrainType ttype = _terrainCache[pos];
+        if (ttype == TerrainType.NONE) {
+            // generate terrain type and cache
+            ttype = MapGen.getTerrainType(pos);
+        }
+
         // TODO: apply overrides (e.g. buildings)
+
+        return Tile({terrain: TerrainLib.ttypeToTerrain(ttype), metadata: ""});
+    }
+
+    function getTileWrite(Position pos) public virtual returns (Tile memory tile) {
+        // get base terrain type
+        TerrainType ttype = _terrainCache[pos];
+        if (ttype == TerrainType.NONE) {
+            // generate terrain type and cache
+            ttype = MapGen.getTerrainType(pos);
+            _terrainCache[pos] = ttype;
+        }
+
+        // TODO: apply overrides (e.g. buildings)
+
+        return Tile({terrain: TerrainLib.ttypeToTerrain(ttype), metadata: ""});
     }
 }

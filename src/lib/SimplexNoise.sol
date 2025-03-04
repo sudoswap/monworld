@@ -3,8 +3,6 @@ pragma solidity ^0.8.13;
 
 import "solady/Milady.sol";
 
-import "./ConstByteArray.sol";
-
 library SimplexNoise {
     using SafeCastLib for *;
     using FixedPointMathLib for *;
@@ -17,30 +15,37 @@ library SimplexNoise {
     int256 internal constant _F2 = 366025403784438646;
     int256 internal constant _G2 = 211324865405187117;
 
-    function noise(
-        int128 x,
-        int128 y,
-        bytes32 permA,
-        bytes32 permB,
-        bytes32 permC,
-        bytes32 permD,
-        bytes32 permE,
-        bytes32 permF,
-        bytes32 permG,
-        bytes32 permH
-    ) internal pure returns (int256 noiseWad) {
-        // Skew input space to determine which simplex (triangle) we are in
-        int256 sWad = (x + y) * _F2;
-        int256 i = divWadDown(x * WAD + sWad);
-        int256 j = divWadDown(y * WAD + sWad);
-        int256 tWad = (i + j) * _G2;
+    function noise(int128 x, int128 y, bytes memory perm) internal pure returns (int256 noiseWad) {
+        int256 i;
+        int256 j;
+        int256 x0Wad;
+        int256 y0Wad;
+        {
+            // Skew input space to determine which simplex (triangle) we are in
+            int256 sWad = (x + y) * _F2;
+            i = divWadDown(x * WAD + sWad);
+            j = divWadDown(y * WAD + sWad);
+            int256 tWad = (i + j) * _G2;
 
-        // "Unskewed" distances from cell origin
-        int256 x0Wad = x * WAD - (i * WAD - tWad);
-        int256 y0Wad = y * WAD - (j * WAD - tWad);
+            // "Unskewed" distances from cell origin
+            x0Wad = x * WAD - (i * WAD - tWad);
+            y0Wad = y * WAD - (j * WAD - tWad);
+        }
 
         (int256 i1Wad, int256 j1Wad, uint8 i1, uint8 j1) =
             x0Wad > y0Wad ? (WAD, int256(0), 1, 0) : (int256(0), WAD, 0, 1);
+
+        // Determine hashed gradient indices of the three simplex corners
+        uint8 gi0;
+        uint8 gi1;
+        uint8 gi2;
+        unchecked {
+            uint8 ii = uint8(int8(i % PERIOD));
+            uint8 jj = uint8(int8(j % PERIOD));
+            gi0 = uint8(perm[ii + uint8(perm[jj])]) % 12;
+            gi1 = uint8(perm[ii + i1 + uint8(perm[jj + j1])]) % 12;
+            gi2 = uint8(perm[ii + 1 + uint8(perm[jj + 1])]) % 12;
+        }
 
         // Offsets for middle corner in (x,y) unskewed coords
         int256 x1Wad = x0Wad - i1Wad + _G2;
@@ -49,48 +54,6 @@ library SimplexNoise {
         // Offsets for last corner in (x,y) unskewed coords
         int256 x2Wad = x0Wad + _G2 * 2 - WAD;
         int256 y2Wad = y0Wad + _G2 * 2 - WAD;
-
-        // Determine hashed gradient indices of the three simplex corners
-        uint8 ii = uint8(int8(i % PERIOD));
-        uint8 jj = uint8(int8(j % PERIOD));
-        uint8 gi0;
-        uint8 gi1;
-        uint8 gi2;
-        unchecked {
-            gi0 = ConstByteArray.get(
-                ii + ConstByteArray.get(jj, permA, permB, permC, permD, permE, permF, permG, permH),
-                permA,
-                permB,
-                permC,
-                permD,
-                permE,
-                permF,
-                permG,
-                permH
-            ) % 12;
-            gi1 = ConstByteArray.get(
-                ii + i1 + ConstByteArray.get(jj + j1, permA, permB, permC, permD, permE, permF, permG, permH),
-                permA,
-                permB,
-                permC,
-                permD,
-                permE,
-                permF,
-                permG,
-                permH
-            ) % 12;
-            gi2 = ConstByteArray.get(
-                ii + 1 + ConstByteArray.get(jj + 1, permA, permB, permC, permD, permE, permF, permG, permH),
-                permA,
-                permB,
-                permC,
-                permD,
-                permE,
-                permF,
-                permG,
-                permH
-            ) % 12;
-        }
 
         // Calculate the contribution from the three corners
         int256 ttWad = WAD / 2 - x0Wad.sMulWad(x0Wad) - y0Wad.sMulWad(y0Wad);
