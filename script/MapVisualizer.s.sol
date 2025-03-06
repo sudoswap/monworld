@@ -2,11 +2,15 @@
 pragma solidity ^0.8.13;
 
 import {Script, console} from "forge-std/Script.sol";
+
+import "solady/Milady.sol";
+
 import "../src/lib/MapGen.sol";
 import "../src/types/Types.sol";
 
 contract MapVisualizerScript is Script {
     using PositionLib for Position;
+    using LibString for *;
 
     function run() public {
         vm.pauseGasMetering();
@@ -19,19 +23,32 @@ contract MapVisualizerScript is Script {
         string memory RESET = "\x1b[0m"; // Reset color
 
         // Symbols for different terrain types
-        string memory WATER_SYMBOL = unicode"█";
-        string memory GRASSLAND_SYMBOL = unicode"█";
-        string memory FOREST_SYMBOL = unicode"█";
-        string memory MOUNTAIN_SYMBOL = unicode"█";
+        string memory WATER_SYMBOL = unicode"██";
+        string memory GRASSLAND_SYMBOL = unicode"██";
+        string memory FOREST_SYMBOL = unicode"██";
+        string memory MOUNTAIN_SYMBOL = unicode"██";
         string memory NONE_SYMBOL = " ";
 
-        console.log("Generating map for region x: [-50, 50], y: [-50, 50]");
+        int128 mapSize = 50;
+        console.log(
+            string.concat(
+                "Generating map for region x: [-",
+                mapSize.toString(),
+                ", ",
+                mapSize.toString(),
+                "], y: [-",
+                mapSize.toString(),
+                ", ",
+                mapSize.toString(),
+                "]"
+            )
+        );
 
         // Map the region (y decreasing to make north at the top)
-        for (int128 y = 50; y >= -50; y--) {
+        for (int128 y = mapSize; y >= -mapSize; y--) {
             string memory line = "";
 
-            for (int128 x = -50; x <= 50; x++) {
+            for (int128 x = -mapSize; x <= mapSize; x++) {
                 Position pos = PositionLib.fromCoordinates(x, y);
                 TerrainType terrainType = MapGen.getTerrainType(pos);
 

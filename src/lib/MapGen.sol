@@ -18,8 +18,8 @@ library MapGen {
     int256 internal constant WAD = 1 ether;
     int256 internal constant ELEVATION_BIAS_WAD = 0.1 ether;
 
-    int256 internal constant WATER_THRESHOLD_WAD = -0.5 ether;
-    int256 internal constant MOUNTAIN_THRESHOLD_WAD = 0.5 ether;
+    int256 internal constant WATER_THRESHOLD_WAD = -0.20 ether;
+    int256 internal constant MOUNTAIN_THRESHOLD_WAD = 0.35 ether;
     int256 internal constant FOREST_THRESHOLD_WAD = 0.55 ether;
 
     uint256 internal constant MIN_SIMILAR_NEIGHBORS = 2; // Minimum similar neighbors to prevent isolated tiles
@@ -29,14 +29,28 @@ library MapGen {
 
     /// @notice Returns the elevation at a position, result is between -1 and 1 and scaled by WAD.
     function getElevation(Position pos) internal pure returns (int256 elevationWad) {
-        elevationWad = fractal({pos: pos, octaves: 1, persistenceWad: 0.5 ether, lacunarityWad: 2 ether, permId: 0});
+        elevationWad = fractal({
+            pos: pos,
+            octaves: 4,
+            persistenceWad: 0.7 ether,
+            lacunarityWad: 1.43 ether,
+            scaleWad: 1 ether,
+            permId: 0
+        });
         elevationWad += ELEVATION_BIAS_WAD;
         elevationWad = elevationWad.clamp(-WAD, WAD);
     }
 
     /// @notice Returns the moisture at a position, result is between 0 and 1 and scaled by WAD.
     function getMoisture(Position pos) internal pure returns (int256 moistureWad) {
-        moistureWad = fractal({pos: pos, octaves: 1, persistenceWad: 0.5 ether, lacunarityWad: 2 ether, permId: 1});
+        moistureWad = fractal({
+            pos: pos,
+            octaves: 6,
+            persistenceWad: 0.5 ether,
+            lacunarityWad: 2 ether,
+            scaleWad: 1 ether,
+            permId: 1
+        });
         moistureWad = (moistureWad + WAD) / 2; // scale to 0-1
     }
 
@@ -165,15 +179,18 @@ library MapGen {
         }
     }
 
-    function fractal(Position pos, uint8 octaves, int256 persistenceWad, int128 lacunarityWad, uint256 permId)
-        private
-        pure
-        returns (int256 total)
-    {
+    function fractal(
+        Position pos,
+        uint8 octaves,
+        int256 persistenceWad,
+        int128 lacunarityWad,
+        int128 scaleWad,
+        uint256 permId
+    ) private pure returns (int256 total) {
         if (octaves == 0) return 0;
         int128 x = pos.x();
         int128 y = pos.y();
-        int128 frequencyWad = int128(WAD);
+        int128 frequencyWad = scaleWad;
         int256 amplitudeWad = WAD;
         int256 maxValueWad = 0;
         bytes memory perm = permId == 0 ? PERM_0 : PERM_1;
