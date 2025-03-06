@@ -18,7 +18,7 @@ library MapGen {
     int256 internal constant WAD = 1 ether;
     int256 internal constant ELEVATION_BIAS_WAD = 0.1 ether;
 
-    int256 internal constant WATER_THRESHOLD_WAD = -0.20 ether;
+    int256 internal constant WATER_THRESHOLD_WAD = -0.2 ether;
     int256 internal constant MOUNTAIN_THRESHOLD_WAD = 0.35 ether;
     int256 internal constant FOREST_THRESHOLD_WAD = 0.55 ether;
 

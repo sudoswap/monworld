@@ -9,8 +9,22 @@ struct Terrain {
 }
 
 library TerrainLib {
-    bytes private constant BLOCKS_TO_MOVE_LOOKUP =
-        abi.encode([type(uint128).max, type(uint128).max, 10, 20, type(uint128).max]);
+    uint256 private constant IMPASSABLE = type(uint128).max;
+    bytes private constant BLOCKS_TO_MOVE_LOOKUP = abi.encode(
+        [
+            IMPASSABLE, // NONE
+            IMPASSABLE, // WATER
+            10, // GRASSLAND
+            20, // FOREST
+            IMPASSABLE, // MOUNTAIN
+            IMPASSABLE, // FENCE
+            8, // ROAD
+            10, // FARMLAND
+            8, // PAVEMENT
+            IMPASSABLE, // WALL
+            8 // DOOR
+        ]
+    );
 
     function ttypeToTerrain(TerrainType ttype) internal pure returns (Terrain memory terrain) {
         uint256[] memory blocksToMoveLookup = abi.decode(BLOCKS_TO_MOVE_LOOKUP, (uint256[]));

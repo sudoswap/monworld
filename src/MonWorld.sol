@@ -21,6 +21,7 @@ struct PlayerPosition {
 contract MonWorld {
     mapping(address player => PlayerPosition) internal _playerPositions;
     mapping(Position pos => TerrainType) internal _terrainCache;
+    mapping(Position pos => TerrainType) internal _structures;
 
     function move(MoveDirection dir) public virtual {
         address player = LibMulticaller.senderOrSigner();
@@ -36,6 +37,14 @@ contract MonWorld {
         });
     }
 
+    function put(MoveDirection dir, TerrainType ttype) public virtual {
+        require(ttype.isStructure(), "Not a structure");
+
+        Position pos = getPlayerPosition(msg.sender);
+        Position destPos = pos.applyMove(dir);
+        _structures[destPos] = ttype;
+    }
+
     function getPlayerPosition(address player) public view virtual returns (Position pos) {
         PlayerPosition memory playerPos = _playerPositions[player];
         pos = (block.number >= playerPos.pendingPosBlock && playerPos.pendingPosBlock != 0)
@@ -44,28 +53,40 @@ contract MonWorld {
     }
 
     function getTileView(Position pos) public view virtual returns (Tile memory tile) {
+        TerrainType ttype;
+
+        // check for structures
+        ttype = _structures[pos];
+        if (ttype != TerrainType.NONE) {
+            return Tile({terrain: TerrainLib.ttypeToTerrain(ttype), metadata: ""});
+        }
+
         // get base terrain type
-        TerrainType ttype = _terrainCache[pos];
+        ttype = _terrainCache[pos];
         if (ttype == TerrainType.NONE) {
             // generate terrain type and cache
             ttype = MapGen.getTerrainType(pos);
         }
-
-        // TODO: apply overrides (e.g. buildings)
 
         return Tile({terrain: TerrainLib.ttypeToTerrain(ttype), metadata: ""});
     }
 
     function getTileWrite(Position pos) public virtual returns (Tile memory tile) {
+        TerrainType ttype;
+
+        // check for structures
+        ttype = _structures[pos];
+        if (ttype != TerrainType.NONE) {
+            return Tile({terrain: TerrainLib.ttypeToTerrain(ttype), metadata: ""});
+        }
+
         // get base terrain type
-        TerrainType ttype = _terrainCache[pos];
+        ttype = _terrainCache[pos];
         if (ttype == TerrainType.NONE) {
             // generate terrain type and cache
             ttype = MapGen.getTerrainType(pos);
             _terrainCache[pos] = ttype;
         }
-
-        // TODO: apply overrides (e.g. buildings)
 
         return Tile({terrain: TerrainLib.ttypeToTerrain(ttype), metadata: ""});
     }

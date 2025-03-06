@@ -6,5 +6,19 @@ enum TerrainType {
     WATER,
     GRASSLAND,
     FOREST,
-    MOUNTAIN
+    MOUNTAIN,
+    FENCE,
+    ROAD,
+    FARMLAND,
+    PAVEMENT,
+    WALL,
+    DOOR
+}
+
+using TerrainTypeLib for TerrainType global;
+
+library TerrainTypeLib {
+    function isStructure(TerrainType ttype) internal pure returns (bool) {
+        return uint8(ttype) >= uint8(TerrainType.FENCE);
+    }
 }
