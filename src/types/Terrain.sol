@@ -27,7 +27,7 @@ library TerrainLib {
     );
 
     function ttypeToTerrain(TerrainType ttype) internal pure returns (Terrain memory terrain) {
-        uint256[] memory blocksToMoveLookup = abi.decode(BLOCKS_TO_MOVE_LOOKUP, (uint256[]));
+        uint256[11] memory blocksToMoveLookup = abi.decode(BLOCKS_TO_MOVE_LOOKUP, (uint256[11]));
         terrain = Terrain({ttype: ttype, blocksToMove: blocksToMoveLookup[uint8(ttype)]});
     }
 }
