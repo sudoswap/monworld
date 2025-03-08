@@ -19,9 +19,20 @@ struct PlayerPosition {
 }
 
 contract MonWorld {
+    using DynamicArrayLib for *;
+    using EnumerableSetLib for EnumerableSetLib.AddressSet;
+
     mapping(address player => PlayerPosition) internal _playerPositions;
     mapping(Position pos => TerrainType) internal _terrainCache;
     mapping(Position pos => TerrainType) internal _structures;
+    mapping(Position pos => EnumerableSetLib.AddressSet) internal _playersAtPos;
+
+    function spawn(Position pos) public virtual {
+        address player = LibMulticaller.senderOrSigner();
+        require(_playerPositions[player].pendingPosBlock == 0, "Already spawned");
+        _playerPositions[player] = PlayerPosition({currentPos: pos, pendingPos: pos, pendingPosBlock: block.number});
+        _playersAtPos[pos].add(player);
+    }
 
     function move(MoveDirection dir) public virtual {
         address player = LibMulticaller.senderOrSigner();
@@ -35,6 +46,7 @@ contract MonWorld {
             pendingPos: destPos,
             pendingPosBlock: block.number + destTile.terrain.blocksToMove
         });
+        _playersAtPos[pos].add(player);
     }
 
     function put(MoveDirection dir, TerrainType ttype) public virtual {
@@ -50,6 +62,28 @@ contract MonWorld {
         pos = (block.number >= playerPos.pendingPosBlock && playerPos.pendingPosBlock != 0)
             ? playerPos.pendingPos
             : playerPos.currentPos;
+    }
+
+    function getPlayersAtPos(Position pos) public view virtual returns (address[] memory) {
+        DynamicArrayLib.DynamicArray memory result;
+        result.data = _playersAtPos[pos].values().toUint256Array();
+
+        // add players in adjacent positions if the pending position is `pos` and it's already been applied
+        Position neighbor;
+        address[] memory neighborPlayers;
+        Position neighborPlayerPos;
+        for (uint256 i; i <= uint8(type(MoveDirection).max); i++) {
+            neighbor = pos.applyMove(MoveDirection(uint8(i)));
+            neighborPlayers = _playersAtPos[neighbor].values();
+            for (uint256 j; j < neighborPlayers.length; j++) {
+                neighborPlayerPos = getPlayerPosition(neighborPlayers[j]);
+                if (neighborPlayerPos == pos) {
+                    result.p(neighborPlayers[j]);
+                }
+            }
+        }
+
+        return result.asAddressArray();
     }
 
     function getTileView(Position pos) public view virtual returns (Tile memory tile) {
