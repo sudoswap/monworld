@@ -66,7 +66,18 @@ contract MonWorld {
 
     function getPlayersAtPos(Position pos) public view virtual returns (address[] memory) {
         DynamicArrayLib.DynamicArray memory result;
-        result.data = _playersAtPos[pos].values().toUint256Array();
+
+        // filter out players in pos that have already moved out of it
+        {
+            address[] memory initialPlayers = _playersAtPos[pos].values();
+            Position playerPos;
+            for (uint256 i; i < initialPlayers.length; i++) {
+                playerPos = getPlayerPosition(initialPlayers[i]);
+                if (playerPos == pos) {
+                    result.p(initialPlayers[i]);
+                }
+            }
+        }
 
         // add players in adjacent positions if the pending position is `pos` and it's already been applied
         Position neighbor;
