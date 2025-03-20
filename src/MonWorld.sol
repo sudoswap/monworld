@@ -27,15 +27,22 @@ contract MonWorld {
     mapping(Position pos => TerrainType) internal _structures;
     mapping(Position pos => EnumerableSetLib.AddressSet) internal _playersAtPos;
 
+    event Spawn(address indexed player, Position indexed pos);
+    event Move(address indexed player, Position indexed from, Position indexed to, uint256 pendingBlock);
+    event Put(address indexed player, Position indexed pos, TerrainType indexed ttype);
+
     function spawn(Position pos) public virtual {
         address player = LibMulticaller.senderOrSigner();
         require(_playerPositions[player].pendingPosBlock == 0, "Already spawned");
         _playerPositions[player] = PlayerPosition({currentPos: pos, pendingPos: pos, pendingPosBlock: block.number});
         _playersAtPos[pos].add(player);
+
+        emit Spawn(player, pos);
     }
 
     function move(MoveDirection dir) public virtual {
         address player = LibMulticaller.senderOrSigner();
+        require(_playerPositions[player].pendingPosBlock != 0, "Not spawned");
         Position pos = getPlayerPosition(player);
         Position destPos = pos.applyMove(dir);
         // early return if already moving to that position
@@ -47,14 +54,19 @@ contract MonWorld {
             pendingPosBlock: block.number + destTile.terrain.blocksToMove
         });
         _playersAtPos[pos].add(player);
+
+        emit Move(player, pos, destPos, block.number + destTile.terrain.blocksToMove);
     }
 
     function put(MoveDirection dir, TerrainType ttype) public virtual {
         require(ttype.isStructure(), "Not a structure");
 
-        Position pos = getPlayerPosition(msg.sender);
+        address player = LibMulticaller.senderOrSigner();
+        Position pos = getPlayerPosition(player);
         Position destPos = pos.applyMove(dir);
         _structures[destPos] = ttype;
+
+        emit Put(player, destPos, ttype);
     }
 
     function getPlayerPosition(address player) public view virtual returns (Position pos) {
