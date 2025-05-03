@@ -5,29 +5,30 @@ import "./TerrainType.sol";
 
 struct Terrain {
     TerrainType ttype;
-    uint256 blocksToMove;
+    uint256 energyCost;
 }
 
 library TerrainLib {
-    uint256 private constant IMPASSABLE = type(uint128).max;
-    bytes private constant BLOCKS_TO_MOVE_LOOKUP = abi.encode(
+    uint256 internal constant ENERGY_PER_BLOCK = 100;
+    uint256 private constant IMPASSABLE = ENERGY_PER_BLOCK + 1;
+    bytes private constant ENERGY_COST_LOOKUP = abi.encode(
         [
             IMPASSABLE, // NONE
             IMPASSABLE, // WATER
-            10, // GRASSLAND
-            20, // FOREST
+            20, // GRASSLAND
+            50, // FOREST
             IMPASSABLE, // MOUNTAIN
             IMPASSABLE, // FENCE
-            8, // ROAD
-            10, // FARMLAND
-            8, // PAVEMENT
+            10, // ROAD
+            20, // FARMLAND
+            10, // PAVEMENT
             IMPASSABLE, // WALL
-            8 // DOOR
+            10 // DOOR
         ]
     );
 
     function ttypeToTerrain(TerrainType ttype) internal pure returns (Terrain memory terrain) {
-        uint256[11] memory blocksToMoveLookup = abi.decode(BLOCKS_TO_MOVE_LOOKUP, (uint256[11]));
-        terrain = Terrain({ttype: ttype, blocksToMove: blocksToMoveLookup[uint8(ttype)]});
+        uint256[11] memory energyCostLookup = abi.decode(ENERGY_COST_LOOKUP, (uint256[11]));
+        terrain = Terrain({ttype: ttype, energyCost: energyCostLookup[uint8(ttype)]});
     }
 }

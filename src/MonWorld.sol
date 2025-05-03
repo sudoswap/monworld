@@ -12,79 +12,93 @@ struct Tile {
     bytes metadata;
 }
 
-struct PlayerPosition {
-    Position currentPos;
-    Position pendingPos;
-    uint256 pendingPosBlock;
-}
-
 contract MonWorld {
     using DynamicArrayLib for *;
     using EnumerableSetLib for EnumerableSetLib.AddressSet;
 
-    mapping(address player => PlayerPosition) internal _playerPositions;
+    mapping(address player => bool) internal _hasSpawned;
+    mapping(address player => Position) internal _playerPositions;
+    mapping(address player => mapping(uint256 blockNum => uint256)) internal _playerEnergySpentInBlock;
     mapping(Position pos => TerrainType) internal _terrainCache;
     mapping(Position pos => TerrainType) internal _structures;
     mapping(Position pos => EnumerableSetLib.AddressSet) internal _playersAtPos;
 
     event Spawn(address indexed player, Position indexed pos);
-    event Move(address indexed player, Position indexed from, Position indexed to, uint256 pendingBlock);
+    event Move(address indexed player, Position indexed from, Position indexed to);
     event Put(address indexed player, Position indexed pos, TerrainType indexed ttype);
 
-    function spawn(Position pos) public virtual {
+    function spawn(int128 x, int128 y) public virtual {
         address player = LibMulticaller.senderOrSigner();
-        require(_playerPositions[player].pendingPosBlock == 0, "Already spawned");
-        _playerPositions[player] = PlayerPosition({currentPos: pos, pendingPos: pos, pendingPosBlock: block.number});
+
+        require(!_hasSpawned[player], "Already spawned");
+
+        Position pos = PositionLib.fromCoordinates(x, y);
+        _playerPositions[player] = pos;
         _playersAtPos[pos].add(player);
+        _hasSpawned[player] = true;
 
         emit Spawn(player, pos);
     }
 
     function move(MoveDirection dir) public virtual {
         address player = LibMulticaller.senderOrSigner();
-        require(_playerPositions[player].pendingPosBlock != 0, "Not spawned");
-        Position pos = getPlayerPosition(player);
-        Position destPos = pos.applyMove(dir);
-        // early return if already moving to that position
-        if (_playerPositions[player].pendingPos == destPos) return;
-        Tile memory destTile = getTileWrite(destPos);
-        _playerPositions[player] = PlayerPosition({
-            currentPos: pos,
-            pendingPos: destPos,
-            pendingPosBlock: block.number + destTile.terrain.blocksToMove
-        });
-        _playersAtPos[pos].add(player);
+        require(_hasSpawned[player], "Not spawned");
 
-        emit Move(player, pos, destPos, block.number + destTile.terrain.blocksToMove);
+        // read player position & tile info
+        Position pos = _playerPositions[player];
+        Position destPos = pos.applyMove(dir);
+        Tile memory destTile = getTileWrite(destPos.x(), destPos.y());
+
+        // expend energy
+        uint256 energySpent = _playerEnergySpentInBlock[player][block.number] + destTile.terrain.energyCost;
+        require(energySpent <= TerrainLib.ENERGY_PER_BLOCK, "Not enough energy");
+        _playerEnergySpentInBlock[player][block.number] = energySpent;
+
+        // move player
+        _playerPositions[player] = destPos;
+        _playersAtPos[pos].remove(player);
+        _playersAtPos[destPos].add(player);
+
+        emit Move(player, pos, destPos);
     }
 
     function put(MoveDirection dir, TerrainType ttype) public virtual {
         require(ttype.isStructure(), "Not a structure");
 
         address player = LibMulticaller.senderOrSigner();
-        Position pos = getPlayerPosition(player);
+        Position pos = _playerPositions[player];
         Position destPos = pos.applyMove(dir);
         _structures[destPos] = ttype;
 
         emit Put(player, destPos, ttype);
     }
 
-    function getPlayerPosition(address player) public view virtual returns (Position pos) {
-        PlayerPosition memory playerPos = _playerPositions[player];
-        pos = (block.number >= playerPos.pendingPosBlock && playerPos.pendingPosBlock != 0)
-            ? playerPos.pendingPos
-            : playerPos.currentPos;
+    /// -----------------------------------------------------------------------
+    /// Getters
+    /// -----------------------------------------------------------------------
+
+    function getHasSpawned(address player) public view virtual returns (bool) {
+        return _hasSpawned[player];
     }
 
-    function getPlayersAtPos(Position pos) public view virtual returns (address[] memory) {
+    function getPlayerPosition(address player) public view virtual returns (int128 x, int128 y) {
+        return (_playerPositions[player].x(), _playerPositions[player].y());
+    }
+
+    function getEnergySpentInBlock(address player, uint256 blockNum) public view virtual returns (uint256) {
+        return _playerEnergySpentInBlock[player][blockNum];
+    }
+
+    function getPlayersAtPos(int128 x, int128 y) public view virtual returns (address[] memory) {
         DynamicArrayLib.DynamicArray memory result;
+        Position pos = PositionLib.fromCoordinates(x, y);
 
         // filter out players in pos that have already moved out of it
         {
             address[] memory initialPlayers = _playersAtPos[pos].values();
             Position playerPos;
             for (uint256 i; i < initialPlayers.length; i++) {
-                playerPos = getPlayerPosition(initialPlayers[i]);
+                playerPos = _playerPositions[initialPlayers[i]];
                 if (playerPos == pos) {
                     result.p(initialPlayers[i]);
                 }
@@ -99,7 +113,7 @@ contract MonWorld {
             neighbor = pos.applyMove(MoveDirection(uint8(i)));
             neighborPlayers = _playersAtPos[neighbor].values();
             for (uint256 j; j < neighborPlayers.length; j++) {
-                neighborPlayerPos = getPlayerPosition(neighborPlayers[j]);
+                neighborPlayerPos = _playerPositions[neighborPlayers[j]];
                 if (neighborPlayerPos == pos) {
                     result.p(neighborPlayers[j]);
                 }
@@ -109,7 +123,8 @@ contract MonWorld {
         return result.asAddressArray();
     }
 
-    function getTileView(Position pos) public view virtual returns (Tile memory tile) {
+    function getTileView(int128 x, int128 y) public view virtual returns (Tile memory tile) {
+        Position pos = PositionLib.fromCoordinates(x, y);
         TerrainType ttype;
 
         // check for structures
@@ -128,7 +143,8 @@ contract MonWorld {
         return Tile({terrain: TerrainLib.ttypeToTerrain(ttype), metadata: ""});
     }
 
-    function getTileWrite(Position pos) public virtual returns (Tile memory tile) {
+    function getTileWrite(int128 x, int128 y) public virtual returns (Tile memory tile) {
+        Position pos = PositionLib.fromCoordinates(x, y);
         TerrainType ttype;
 
         // check for structures
