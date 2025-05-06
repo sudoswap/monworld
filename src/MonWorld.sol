@@ -143,6 +143,38 @@ contract MonWorld {
         return Tile({terrain: TerrainLib.ttypeToTerrain(ttype), metadata: ""});
     }
 
+    function getTtypeView(int128 x, int128 y) public view virtual returns (TerrainType ttype) {
+        Position pos = PositionLib.fromCoordinates(x, y);
+
+        // check for structures
+        ttype = _structures[pos];
+        if (ttype != TerrainType.NONE) {
+            return ttype;
+        }
+
+        // get base terrain type
+        ttype = _terrainCache[pos];
+        if (ttype == TerrainType.NONE) {
+            // generate terrain type
+            return MapGen.getTerrainType(pos);
+        }
+
+        return ttype;
+    }
+
+    function getTtypesPacked(int128[] calldata xList, int128[] calldata yList)
+        external
+        view
+        virtual
+        returns (bytes memory packedTtypes)
+    {
+        require(xList.length == yList.length, "Length mismatch");
+        packedTtypes = new bytes(xList.length);
+        for (uint256 i; i < xList.length; i++) {
+            packedTtypes[i] = bytes1(uint8(getTtypeView(xList[i], yList[i])));
+        }
+    }
+
     function getTileWrite(int128 x, int128 y) public virtual returns (Tile memory tile) {
         Position pos = PositionLib.fromCoordinates(x, y);
         TerrainType ttype;

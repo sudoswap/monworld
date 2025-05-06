@@ -19,4 +19,15 @@ contract CounterTest is Test {
         assertEq(x, xCord, "x incorrect");
         assertEq(y, yCord, "y incorrect");
     }
+
+    function testTtypesPacked() public view {
+        int128[] memory xList = new int128[](10);
+        int128[] memory yList = new int128[](10);
+        for (uint256 i; i < 10; i++) {
+            xList[i] = int128(uint128(i));
+            yList[i] = int128(uint128(i));
+        }
+        bytes memory packedTtypes = world.getTtypesPacked(xList, yList);
+        assertEq(packedTtypes.length, 10, "length incorrect");
+    }
 }
